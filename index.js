@@ -92,7 +92,6 @@ function getPath (path, name, profiles, label) {
         (label ? '/' + encodeURIComponent(label) : '')
 }
 
-
 function fetchAccessToken (clientId, clientSecret, tokenEndpoint, callback) {
   // get the access token
   const endpoint = URL.parse(tokenEndpoint)
@@ -145,6 +144,18 @@ function loadWithCallback (options, callback) {
   const name = options.name || options.application
   const context = options.context
   const client = endpoint.protocol === 'https:' ? https : http
+  let headers
+
+  if (options.token && options.vaultToken) {
+    headers = {
+      'Authorization': "Bearer " + options.token,
+      'X-Config-Token': options.vaultToken
+    }
+  } else if (options.token) {
+    headers = {
+      'Authorization': "Bearer " + options.token
+    }
+  }
 
   client.request({
     protocol: endpoint.protocol,
@@ -154,7 +165,7 @@ function loadWithCallback (options, callback) {
     auth: getAuth(options.auth, endpoint),
     rejectUnauthorized: options.rejectUnauthorized !== false,
     agent: options.agent,
-    headers: options.token ? { Authorization: "Bearer " + options.token }: {}
+    headers: headers ? headers : {}
   }, (res) => {
     if (res.statusCode !== 200) { // OK
       res.resume() // it consumes response
@@ -213,23 +224,21 @@ module.exports = {
      * @since 1.0.0
      */
   load (options, callback) {
-
-  if (options.client_id && options.client_secret && options.access_token_uri) {
-    return new Promise((resolve, reject) => {
-        fetchAccessToken(options.client_id, options.client_secret, options.access_token_uri,
-          (error, grant) => {
-            if (error) {
-              reject(error)
-            } else {
-              resolve(grant)
+    if (options.client_id && options.client_secret && options.access_token_uri) {
+      return new Promise((resolve, reject) => {
+          fetchAccessToken(options.client_id, options.client_secret, options.access_token_uri,
+            (error, grant) => {
+              if (error) {
+                reject(error)
+              } else {
+                resolve(grant)
+              }
             }
-          }
-        );
-      }).then( ( grant ) => {
-        options.token = grant.access_token;
-        return loadConfig(options,callback);
-      })
-
+          );
+        }).then( ( grant ) => {
+          options.token = grant.access_token;
+          return loadConfig(options,callback);
+        })
     } else {
       return loadConfig(options,callback);
     }
